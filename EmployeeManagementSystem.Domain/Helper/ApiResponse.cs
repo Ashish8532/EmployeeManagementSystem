@@ -4,9 +4,9 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace EmployeeManagementSystem.Domain.Dtos
+namespace EmployeeManagementSystem.Domain.Helper
 {
-    public class ApiResponseDto<T>
+    public class ApiResponse<T>
     {
         public int StatusCode { get; set; }
         public string Message { get; set; }

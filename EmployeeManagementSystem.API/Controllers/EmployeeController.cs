@@ -1,48 +1,47 @@
-﻿using EmployeeManagementSystem.Data.Context;
+﻿using AutoMapper;
+using EmployeeManagementSystem.Data.Context;
 using EmployeeManagementSystem.Domain.Dtos;
 using EmployeeManagementSystem.Domain.Helper;
 using EmployeeManagementSystem.Domain.Models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using System;
 
 namespace EmployeeManagementSystem.API.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    public class DepartmentController : ControllerBase
+    public class EmployeeController : ControllerBase
     {
         private readonly EMSDbContext _context;
+        private readonly IMapper _mapper;
 
         /// <summary>
         /// Constructor for the DepartmentController.
         /// </summary>
         /// <param name="context">The database context for the application.</param>
-        public DepartmentController(EMSDbContext context)
+        public EmployeeController(EMSDbContext context, IMapper mapper)
         {
             _context = context;
+            _mapper = mapper;
         }
 
-
         /// <summary>
-        /// Retrieves the list of departments from the database.
+        /// Gets a list of all employees.
         /// </summary>
-        /// <returns>
-        /// An IActionResult containing ApiResponseDto<IEnumerable<Department>>.
-        /// The ApiResponseDto includes the status code, a descriptive message, and the retrieved list of departments.
-        /// </returns>
-        [HttpGet("Department-List")]
-        public async Task<IActionResult> GetDepartments()
+        /// <returns>An IActionResult containing ApiResponseDto<IEnumerable<Employee>>.</returns>
+        [HttpGet("Employee-List")]
+        public async Task<IActionResult> GetEmployees()
         {
             try
             {
-                var departments = await _context.Departments.ToListAsync();
-                return Ok(new ApiResponse<IEnumerable<Department>>
+                var employees = await _context.Employees.ToListAsync();
+
+                return Ok(new ApiResponse<IEnumerable<Employee>>
                 {
                     StatusCode = StatusCodes.Status200OK,
-                    Message = "Department list retrieved successfully.",
-                    Data = departments
+                    Message = "Employee list retrieved successfully.",
+                    Data = employees
                 });
             }
             catch (Exception ex)
@@ -57,19 +56,12 @@ namespace EmployeeManagementSystem.API.Controllers
 
 
         /// <summary>
-        /// Adds a new department to the database.
+        /// Adds a new employee to the database.
         /// </summary>
-        /// <param name="departmentDto">The data transfer object containing department information.</param>
-        /// <returns>An IActionResult containing ApiResponseDto<Department>.</returns>
-        /// <remarks>
-        /// This method checks the validity of the provided data using ModelState.
-        /// If the data is valid, it creates a new Department entity based on the provided information.
-        /// The new department is then added to the database asynchronously, and a successful response
-        /// is returned along with ApiResponseDto containing the added department.
-        /// In case of an exception, a 500 Internal Server Error response is returned with an error message.
-        /// </remarks>
-        [HttpPost("Add-Department")]
-        public async Task<IActionResult> AddDepartment([FromBody] DepartmentDto departmentDto)
+        /// <param name="employeeDto">The data transfer object containing employee information.</param>
+        /// <returns>An IActionResult containing ApiResponseDto<Employee>.</returns>
+        [HttpPost("Add-Employee")]
+        public async Task<IActionResult> AddEmployee([FromBody] EmployeeDto employeeDto)
         {
             try
             {
@@ -82,18 +74,19 @@ namespace EmployeeManagementSystem.API.Controllers
                     });
                 }
 
-                var department = new Department
-                {
-                    DepartmentName = departmentDto.DepartmentName
-                };
-                await _context.Departments.AddAsync(department);
+                var employee = _mapper.Map<Employee>(employeeDto);
+
+                await _context.Employees.AddAsync(employee);
                 await _context.SaveChangesAsync();
 
-                return Ok(new ApiResponse<Department>
+                // Explicitly load the related Department data
+                await _context.Entry(employee).Reference(e => e.Department).LoadAsync();
+
+                return Ok(new ApiResponse<Employee>
                 {
                     StatusCode = StatusCodes.Status200OK,
-                    Message = "Department added successfully.",
-                    Data = department
+                    Message = "Employee added successfully.",
+                    Data = employee
                 });
             }
             catch (Exception ex)
@@ -108,30 +101,24 @@ namespace EmployeeManagementSystem.API.Controllers
 
 
         /// <summary>
-        /// Edits an existing department in the database.
+        /// Edits an existing employee in the database.
         /// </summary>
-        /// <param name="id">Department ID.</param>
-        /// <param name="departmentDto">Updated department information.</param>
-        /// <returns>ApiResponseDto<Department>.</returns>
-        /// <remarks>
-        /// Updates department properties based on the provided data.
-        /// 404 if department not found, 400 for invalid data.
-        /// 200 with ApiResponseDto on successful update.
-        /// 500 Internal Server Error in case of an exception.
-        /// </remarks>
-        [HttpPut("Edit-Department/{id}")]
-        public async Task<IActionResult> EditDepartment([FromRoute] int id, [FromBody] DepartmentDto departmentDto)
+        /// <param name="id">The ID of the employee to be edited.</param>
+        /// <param name="employeeDto">The updated employee information.</param>
+        /// <returns>An IActionResult containing ApiResponseDto<Employee>.</returns>
+        [HttpPut("Edit-Employee/{id}")]
+        public async Task<IActionResult> EditEmployee([FromRoute] int id, [FromBody] EmployeeDto employeeDto)
         {
             try
             {
-                var existingDepartment = await _context.Departments.FindAsync(id);
+                var existingEmployee = await _context.Employees.FindAsync(id);
 
-                if (existingDepartment == null)
+                if (existingEmployee == null)
                 {
                     return NotFound(new ApiResponse<object>
                     {
                         StatusCode = StatusCodes.Status404NotFound,
-                        Message = "Department not found"
+                        Message = "Employee not found"
                     });
                 }
 
@@ -144,14 +131,18 @@ namespace EmployeeManagementSystem.API.Controllers
                     });
                 }
 
-                existingDepartment.DepartmentName = departmentDto.DepartmentName;
+                _mapper.Map(employeeDto, existingEmployee);
+
                 await _context.SaveChangesAsync();
 
-                return Ok(new ApiResponse<Department>
+                // Explicitly load the related Department data
+                await _context.Entry(existingEmployee).Reference(e => e.Department).LoadAsync();
+
+                return Ok(new ApiResponse<Employee>
                 {
                     StatusCode = StatusCodes.Status200OK,
-                    Message = "Department updated successfully.",
-                    Data = existingDepartment
+                    Message = "Employee updated successfully.",
+                    Data = existingEmployee
                 });
             }
             catch (Exception ex)
@@ -166,37 +157,33 @@ namespace EmployeeManagementSystem.API.Controllers
 
 
         /// <summary>
-        /// Deletes an existing department from the database.
+        /// Deletes an existing employee from the database.
         /// </summary>
-        /// <param name="id">Department ID.</param>
-        /// <returns>ApiResponseDto<object>.</returns>
-        /// <remarks>
-        /// 404 Not Found if the department doesn't exist.
-        /// 200 OK with ApiResponseDto on successful deletion.
-        /// 500 Internal Server Error in case of an exception.
-        /// </remarks>
-        [HttpDelete("Delete-Department/{id}")]
-        public async Task<IActionResult> DeleteDepartment([FromRoute] int id)
+        /// <param name="id">The ID of the employee to be deleted.</param>
+        /// <returns>An IActionResult containing ApiResponseDto<object>.</returns>
+        [HttpDelete("Delete-Employee/{id}")]
+        public async Task<IActionResult> DeleteEmployee([FromRoute] int id)
         {
             try
             {
-                var department = await _context.Departments.FindAsync(id);
-                if (department == null)
+                var employee = await _context.Employees.FindAsync(id);
+
+                if (employee == null)
                 {
                     return NotFound(new ApiResponse<object>
                     {
                         StatusCode = StatusCodes.Status404NotFound,
-                        Message = "Department not found"
+                        Message = "Employee not found"
                     });
                 }
 
-                _context.Departments.Remove(department);
+                _context.Employees.Remove(employee);
                 await _context.SaveChangesAsync();
 
                 return Ok(new ApiResponse<object>
                 {
                     StatusCode = StatusCodes.Status200OK,
-                    Message = "Department deleted successfully."
+                    Message = "Employee deleted successfully."
                 });
             }
             catch (Exception ex)
