@@ -1,6 +1,13 @@
+using EmployeeManagementSystem.Data.Context;
+using Microsoft.EntityFrameworkCore;
+
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
+
+// Database connection string configuration
+var connectionStrings = builder.Configuration.GetConnectionString("EMSApplicationEntities");
+builder.Services.AddDbContextPool<EMSDbContext>(options => options.UseSqlServer(
+connectionStrings, b => b.MigrationsAssembly("EmployeeManagementSystem.Data")));
 
 builder.Services.AddControllers();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
